@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   Compass,
   FileText,
-  MessageSquare,
   DollarSign,
   ChevronRight,
   ExternalLink,
@@ -23,9 +22,9 @@ import {
 } from 'lucide-react';
 import { DestinationRecommendation, RecommendationResponse, QuizAnswers } from '../types';
 import { QUIZ_STEPS } from '../data/quizQuestions';
+import { CURATED_DESTINATIONS } from '../data/curatedDestinations';
 import { BudgetCalculator } from './BudgetCalculator';
 import { DestinationsComparison } from './DestinationsComparison';
-import { DestinationAiChat } from './DestinationAiChat';
 import { HudGauge } from './HudGauge';
 
 interface ResultsViewProps {
@@ -37,7 +36,7 @@ interface ResultsViewProps {
   onToggleSave: (dest: DestinationRecommendation) => void;
 }
 
-type TabType = 'overview' | 'itinerary' | 'budget' | 'gastronomy' | 'practical' | 'chat';
+type TabType = 'overview' | 'itinerary' | 'budget' | 'gastronomy' | 'practical';
 
 export const ResultsView: React.FC<ResultsViewProps> = ({
   results,
@@ -92,18 +91,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 
           {/* Quick Action Bar */}
           <div className="flex flex-wrap items-center gap-3">
-            {/* Provenance readout: says whether Gemini enriched these results
-                or whether they come straight from the curated database. */}
+            {/* What the ranking actually rests on — both figures come from the
+                data itself, so they cannot drift out of date. */}
             <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-[#030718]/70 border border-cyan-500/20 backdrop-blur-2xl">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  results.generatedWithAi
-                    ? 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.9)]'
-                    : 'bg-sky-500/40'
-                }`}
-              />
+              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.9)]" />
               <span className="hud-label">
-                {results.generatedWithAi ? 'Analyse IA' : 'Base curatée'}
+                {CURATED_DESTINATIONS.length} destinations · {QUIZ_STEPS.length} critères
               </span>
             </div>
 
@@ -370,18 +363,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                 <span>Conseils & Formalités</span>
               </button>
 
-              <button
-                id="tab-btn-chat"
-                onClick={() => setActiveTab('chat')}
-                className={`flex items-center gap-2.5 px-5 py-3 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === 'chat'
-                    ? 'bg-gradient-to-r from-cyan-500 to-sky-500 text-slate-950 shadow-[0_0_20px_rgba(6,182,212,0.6)]'
-                    : 'text-sky-100/70 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>Assistant IA</span>
-              </button>
             </div>
           </div>
 
@@ -641,13 +622,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               </div>
             )}
 
-            {/* TAB 6: AI CHAT */}
-            {activeTab === 'chat' && (
-              <DestinationAiChat
-                destination={selectedDestination}
-                userAnswers={userAnswers}
-              />
-            )}
           </div>
         </div>
 

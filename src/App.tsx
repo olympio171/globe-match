@@ -9,11 +9,11 @@ import { SavedFavoritesModal } from './components/SavedFavoritesModal';
 import { CustomCursor } from './components/CustomCursor';
 import { CosmicBackground } from './components/CosmicBackground';
 import { QUIZ_STEPS, DEFAULT_QUIZ_ANSWERS } from './data/quizQuestions';
+import { CURATED_DESTINATIONS } from './data/curatedDestinations';
 import {
   QuizAnswers,
   RecommendationResponse,
   DestinationRecommendation,
-  ProgressEvent,
   LoadingStep,
 } from './types';
 import { calculateDestinationMatches } from './services/recommendationEngine';
@@ -21,12 +21,30 @@ import { usePrefersReducedMotion } from './hooks/usePrefersReducedMotion';
 
 type AppScreen = 'hero' | 'quiz' | 'loading' | 'results';
 
-/** The three stages the pipeline really has. Nothing here advances on a timer. */
+/** The two stages the pipeline really has. Nothing here advances on a timer. */
 const INITIAL_LOADING_STEPS: LoadingStep[] = [
   { id: 'scoring', label: 'Calcul des affinités', state: 'pending' },
-  { id: 'ai', label: 'Rédaction personnalisée', state: 'pending' },
-  { id: 'render', label: 'Préparation de vos fiches', state: 'pending' },
+  { id: 'covers', label: 'Chargement des visuels', state: 'pending' },
 ];
+
+/**
+ * Resolves once every image has settled, and reports how many actually loaded.
+ * Never rejects: a destination whose photo is unreachable must not block the
+ * results, it just shows up a moment later.
+ */
+function preloadImages(urls: string[]): Promise<number> {
+  return Promise.all(
+    urls.map(
+      (url) =>
+        new Promise<boolean>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(true);
+          img.onerror = () => resolve(false);
+          img.src = url;
+        })
+    )
+  ).then((results) => results.filter(Boolean).length);
+}
 
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>('hero');
@@ -89,90 +107,32 @@ export default function App() {
     const patch = (id: string, changes: Partial<LoadingStep>) =>
       setLoadingSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...changes } : s)));
 
-    try {
-      const response = await fetch('/api/recommendations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(finalAnswers),
-      });
+    // 1. Scoring runs entirely in the browser — no network, no API key.
+    patch('scoring', {
+      state: 'active',
+      detail: `${CURATED_DESTINATIONS.length} destinations · ${QUIZ_STEPS.length} critères`,
+    });
+    const computed = calculateDestinationMatches(finalAnswers);
+    patch('scoring', {
+      state: 'done',
+      detail: `${computed.topDestinations.length} retenues · en tête : ${computed.topDestinations[0]?.name ?? ''}`,
+    });
 
-      if (!response.ok || !response.body) {
-        throw new Error('API server returned error status');
-      }
+    // 2. Preloading the three cover images is the only genuine wait left, and
+    //    doing it here means the results page opens without images popping in.
+    patch('covers', { state: 'active', detail: `${computed.topDestinations.length} visuels` });
+    const loaded = await preloadImages(computed.topDestinations.map((d) => d.coverImage));
+    patch('covers', {
+      state: loaded === computed.topDestinations.length ? 'done' : 'failed',
+      detail:
+        loaded === computed.topDestinations.length
+          ? `${loaded} visuels prêts`
+          : `${loaded}/${computed.topDestinations.length} chargés · les autres suivront`,
+    });
 
-      // Read the NDJSON progress stream. Every step below is driven by an event
-      // the server actually emitted — nothing advances on a timer.
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let payload: RecommendationResponse | null = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const event: ProgressEvent = JSON.parse(line);
-
-          switch (event.phase) {
-            case 'scoring':
-              patch('scoring', {
-                state: 'active',
-                detail: `${event.poolSize} destinations · ${event.criteria} critères`,
-              });
-              break;
-            case 'scored':
-              patch('scoring', { state: 'done', detail: `${event.kept} retenues · en tête : ${event.topName}` });
-              break;
-            case 'ai_start':
-              patch('ai', { state: 'active', detail: event.model });
-              break;
-            case 'ai_fallback':
-              patch('ai', {
-                state: 'active',
-                detail: `${event.from} indisponible (${event.status}) → ${event.to}`,
-              });
-              break;
-            case 'ai_done':
-              patch('ai', { state: 'done', detail: `rédigé par ${event.model}` });
-              break;
-            case 'ai_failed':
-              patch('ai', {
-                state: 'failed',
-                detail: `IA indisponible (${event.status}) · textes curatés`,
-              });
-              break;
-            case 'ai_skipped':
-              patch('ai', { state: 'skipped', detail: 'aucune clé API · textes curatés' });
-              break;
-            case 'result':
-              payload = event.payload;
-              break;
-          }
-        }
-      }
-
-      if (!payload) throw new Error('Stream ended without a result');
-
-      patch('render', { state: 'active' });
-      setResults(payload);
-      patch('render', { state: 'done' });
-      setScreen('results');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) {
-      console.warn('Backend API request failed or offline, calculating locally:', err);
-      // Seamless local calculation fallback
-      patch('scoring', { state: 'done', detail: 'calcul local (serveur injoignable)' });
-      patch('ai', { state: 'skipped', detail: 'hors ligne · textes curatés' });
-      setResults(calculateDestinationMatches(finalAnswers));
-      setScreen('results');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    setResults(computed);
+    setScreen('results');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSubmitQuiz = () => {

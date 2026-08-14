@@ -260,7 +260,7 @@ export const QuizStepView: React.FC<QuizStepViewProps> = ({ step, answers, onCha
         <p className="text-xs text-sky-200/60 mt-3 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-cyan-400" />
           <span className="font-light">
-            Ces détails personnalisés seront directement analysés par l’IA pour affiner vos recommandations et votre itinéraire.
+            Notez ici tout ce qui compte pour vous : ces précisions vous accompagneront sur la fiche de vos destinations.
           </span>
         </p>
       </div>

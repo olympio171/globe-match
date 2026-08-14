@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-const VIDEO_SRC = '/blackhole.mp4';
-const POSTER_SRC = '/blackhole-poster.jpg';
+// BASE_URL, not a leading slash: on GitHub Pages the site lives under /<repo>/
+// and absolute paths would 404.
+const VIDEO_SRC = `${import.meta.env.BASE_URL}blackhole.mp4`;
+const POSTER_SRC = `${import.meta.env.BASE_URL}blackhole-poster.jpg`;
 
 /**
  * Layered cosmic backdrop built on a looping black hole clip.
@@ -12,7 +14,6 @@ const POSTER_SRC = '/blackhole-poster.jpg';
  * video is skipped or fails to load.
  */
 export const CosmicBackground: React.FC = () => {
-  const plateRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Whether the clip is worth downloading at all on this device.
@@ -31,34 +32,9 @@ export const CosmicBackground: React.FC = () => {
     }
   }, []);
 
-  // Scroll parallax. The transform is written straight to the node inside a
-  // rAF — deliberately never through React state, which would re-render the
-  // whole background on every scroll event.
-  useEffect(() => {
-    const plate = plateRef.current;
-    if (!plate) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    let frame = 0;
-
-    const apply = () => {
-      frame = 0;
-      const offset = Math.min(window.scrollY, 1600);
-      plate.style.transform = `translate3d(0, ${offset * 0.16}px, 0) scale(${1 + offset * 0.00007})`;
-    };
-
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(apply);
-    };
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    apply();
-
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, []);
+  // No scroll parallax: the backdrop stays locked to the viewport. A shifting
+  // background reads as a rendering glitch rather than as depth, and the sense
+  // of depth already comes from the layer stack below.
 
   // Some browsers reject autoplay even when muted; fall back to the poster.
   useEffect(() => {
@@ -69,7 +45,7 @@ export const CosmicBackground: React.FC = () => {
   return (
     <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none bg-[#020617]">
       {/* Footage plane — poster and video move together under the parallax */}
-      <div ref={plateRef} className="absolute inset-0 will-change-transform">
+      <div className="absolute inset-0">
         <img
           src={POSTER_SRC}
           alt=""
