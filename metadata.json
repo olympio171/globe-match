@@ -1,6 +1,0 @@
-{
-  "name": "GlobeMatch - Quiz Voyage Sur Mesure",
-  "description": "Un quiz approfondi et immersif pour découvrir vos 3 destinations idéales dans le monde selon vos envies, budget, rythme, climat et intérêts culturels.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

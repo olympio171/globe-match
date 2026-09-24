@@ -33,6 +33,11 @@ jobs:
       - name: Type-check
         run: npm run lint
 
+      # Validates every destination record and checks the ranking on a set of
+      # traveller profiles — a data typo or a scoring regression fails here.
+      - name: Data and ranking checks
+        run: npm test
+
       - name: Build
         # A project site is served from /<repo>/, so asset URLs need that prefix.
         # Derived from the repo name, so renaming the repo cannot break it.
